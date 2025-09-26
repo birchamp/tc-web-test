@@ -162,8 +162,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const filename = `en_tn_${pdfId}_${TRANSLATION_NOTES_VERSION}.pdf`;
     const downloadUrl = `${TRANSLATION_NOTES_BASE}/${filename}`;
 
-    setTimeout(() => {
+    const triggerDownload = () => {
+      if (message) {
+        const safeLink = `<a href="${downloadUrl}" class="inline-link">click here</a>`;
+        message.innerHTML = `If the PDF doesn't open automatically, ${safeLink}.`;
+      }
       window.location.href = downloadUrl;
-    }, 600);
+    };
+
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      triggerDownload();
+      return;
+    }
+
+    setTimeout(triggerDownload, 600);
   });
 });

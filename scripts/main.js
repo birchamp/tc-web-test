@@ -97,10 +97,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!downloadButton) return;
 
   const originalText = downloadButton.textContent;
+  const loadingText = downloadButton.dataset.loadingText || 'Preparing download…';
 
   downloadButton.addEventListener('click', async () => {
     downloadButton.disabled = true;
-    downloadButton.textContent = 'Preparing download…';
+    downloadButton.textContent = loadingText;
     if (statusEl) {
       statusEl.textContent = 'Looking for the latest translationCore release for your device…';
     }

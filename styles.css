@@ -23,9 +23,27 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+
 a {
   color: inherit;
 }
+
+.inline-link {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
 
 img {
   max-width: 100%;
@@ -255,7 +273,8 @@ button.cta {
 /* Helps page */
 
 .helps-page {
-  background: linear-gradient(180deg, #f8f8fa 0%, #ffffff 60%);
+  background: linear-gradient(135deg, #eef2ff 0%, #f4e9ff 45%, #fff7f1 100%);
+  min-height: 100vh;
 }
 
 .helps-main {

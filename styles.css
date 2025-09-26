@@ -414,6 +414,10 @@ body.dialog-open {
   min-height: 1.2rem;
 }
 
+.helps-status--error {
+  color: #a9191f;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download Translation Helps — translationCore Suite</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="helps-page">
+  <header class="site-header helps-header">
+    <div class="brand">
+      <span class="brand-mark">tc</span>
+      <span class="brand-name">translationCore Suite</span>
+    </div>
+    <nav class="site-nav">
+      <a href="index.html#translation-helps">Back to landing</a>
+    </nav>
+  </header>
+
+  <main class="helps-main">
+    <section class="helps-hero">
+      <div class="helps-card">
+        <p class="eyebrow">Translation Notes</p>
+        <h1>Pick a book to open its PDF instantly</h1>
+        <p class="subhead">Choose a Bible book to jump straight into the latest unfoldingWord translation notes (v86.1).</p>
+        <label class="select-label" for="book-select">Book of the Bible</label>
+        <div class="select-wrapper">
+          <select id="book-select" class="book-select">
+            <option value="" disabled selected>Select a book…</option>
+          </select>
+        </div>
+        <p id="download-message" class="hero-status helps-status" aria-live="polite"></p>
+      </div>
+    </section>
+  </main>
+
+  <script src="scripts/helps.js" defer></script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 const RELEASES_API = 'https://git.door43.org/api/v1/repos/unfoldingWord/en_tn/releases';
-const NETLIFY_CACHE_ENDPOINT = 'https://preview.door43.org/.netlify/functions/get-cached-url';
+
 
 const BOOK_GROUPS = [
   {
@@ -110,7 +110,6 @@ const BOOK_GROUPS = [
   }
 ];
 
-const NOTE_COLLECTION_KEYS = ['notes', 'tn', 'items', 'entries', 'content'];
 let releaseInfoPromise;
 let cachedReleaseInfo;
 
@@ -174,217 +173,6 @@ function setStatus(message, { isError = false, asHtml = false } = {}) {
   }
 }
 
-function sanitizeHtmlToText(value) {
-  if (value == null) {
-    return '';
-  }
-
-  if (typeof value !== 'string') {
-    return sanitizeHtmlToText(String(value));
-  }
-
-  if (!value.includes('<')) {
-    return value;
-  }
-
-  const temp = document.createElement('div');
-  temp.innerHTML = value;
-  return temp.textContent || temp.innerText || '';
-}
-
-function extractNoteText(note) {
-  if (!note) {
-    return '';
-  }
-
-  if (typeof note === 'string') {
-    return sanitizeHtmlToText(note).trim();
-  }
-
-  const parts = [];
-  const heading = note.title || note.label || note.heading || note.subject;
-  const quote = note.quote || note.phrase || note.phraseQuoted;
-  const occurrence = note.occurrence || note.Occurrence;
-  const support = note.support_reference || note.supportReference;
-  const primary = note.note || note.Note || note.body || note.text || note.comment || note.explanation;
-
-  if (quote) {
-    const quoteText = sanitizeHtmlToText(quote);
-    const occurrenceLabel = occurrence ? ` (occurrence ${occurrence})` : '';
-    parts.push(`Quote: ${quoteText}${occurrenceLabel}`);
-  }
-
-  if (heading) {
-    parts.push(sanitizeHtmlToText(heading));
-  }
-
-  if (primary) {
-    parts.push(sanitizeHtmlToText(primary));
-  }
-
-  if (support) {
-    parts.push(`Support Reference: ${sanitizeHtmlToText(support)}`);
-  }
-
-  if (Array.isArray(note.items)) {
-    note.items.forEach((item) => {
-      const itemText = extractNoteText(item);
-      if (itemText) {
-        parts.push(itemText);
-      }
-    });
-  }
-
-  if (!parts.length) {
-    const fallbackKeys = ['content', 'bodyHTML', 'html', 'markdown'];
-    const fallback = fallbackKeys
-      .map((key) => (note[key] ? sanitizeHtmlToText(note[key]) : ''))
-      .find((value) => value && value.trim().length);
-
-    if (fallback) {
-      parts.push(fallback.trim());
-    }
-  }
-
-  if (!parts.length) {
-    try {
-      parts.push(sanitizeHtmlToText(JSON.stringify(note)));
-    } catch (error) {
-      parts.push(String(note));
-    }
-  }
-
-  return parts
-    .filter((part) => Boolean(part) && part.toString().trim().length)
-    .join('\n')
-    .trim();
-}
-
-function gatherNotesFromContainer(container) {
-  if (!container || typeof container !== 'object') {
-    return [];
-  }
-
-  const results = [];
-
-  NOTE_COLLECTION_KEYS.forEach((key) => {
-    const collection = container[key];
-    if (Array.isArray(collection)) {
-      collection.forEach((entry) => {
-        const entryText = extractNoteText(entry);
-        if (entryText) {
-          results.push(entryText);
-        }
-      });
-    }
-  });
-
-  if (!results.length) {
-    const direct = extractNoteText(container);
-    if (direct) {
-      results.push(direct);
-    }
-  }
-
-  return results;
-}
-
-function normaliseLabel(value, fallback) {
-  if (value === undefined || value === null) {
-    return fallback;
-  }
-
-  if (typeof value === 'number') {
-    return value;
-  }
-
-  const numericMatch = String(value).match(/\d+/);
-  if (numericMatch) {
-    return parseInt(numericMatch[0], 10);
-  }
-
-  return value;
-}
-
-function flattenNotes(data) {
-  const entries = [];
-
-  if (!data) {
-    return entries;
-  }
-
-  if (Array.isArray(data.chapters)) {
-    data.chapters.forEach((chapter, chapterIndex) => {
-      const chapterLabel = normaliseLabel(chapter.chapter || chapter.number || chapter.id, chapterIndex + 1);
-
-      if (Array.isArray(chapter.verses)) {
-        chapter.verses.forEach((verse, verseIndex) => {
-          const verseLabel = normaliseLabel(verse.verse || verse.number || verse.id, verseIndex + 1);
-          const notes = gatherNotesFromContainer(verse);
-          if (notes.length) {
-            entries.push({ chapter: chapterLabel, verse: verseLabel, notes });
-          }
-        });
-      }
-
-      if (Array.isArray(chapter.frames)) {
-        chapter.frames.forEach((frame, frameIndex) => {
-          const verseLabel = normaliseLabel(
-            frame.verse || frame.verseStart || frame.id || frame.reference?.verse,
-            frameIndex + 1
-          );
-          const notes = gatherNotesFromContainer(frame);
-          if (notes.length) {
-            entries.push({ chapter: chapterLabel, verse: verseLabel, notes });
-          }
-        });
-      }
-    });
-    return entries;
-  }
-
-  if (Array.isArray(data.frames)) {
-    data.frames.forEach((frame, frameIndex) => {
-      const chapterLabel = normaliseLabel(frame.chapter || frame.reference?.chapter, null);
-      const verseLabel = normaliseLabel(frame.verse || frame.reference?.verse || frame.id, frameIndex + 1);
-      const notes = gatherNotesFromContainer(frame);
-      if (notes.length) {
-        entries.push({ chapter: chapterLabel, verse: verseLabel, notes });
-      }
-    });
-    return entries;
-  }
-
-  if (Array.isArray(data)) {
-    data.forEach((item, index) => {
-      const notes = gatherNotesFromContainer(item);
-      if (notes.length) {
-        entries.push({ chapter: null, verse: index + 1, notes });
-      }
-    });
-    return entries;
-  }
-
-  if (data && typeof data === 'object') {
-    Object.keys(data).forEach((key) => {
-      const bucket = data[key];
-      if (!bucket) {
-        return;
-      }
-      const notes = gatherNotesFromContainer(bucket);
-      if (notes.length) {
-        const [chapterPart, versePart] = key.split(':');
-        entries.push({
-          chapter: chapterPart ? normaliseLabel(chapterPart, null) : null,
-          verse: versePart ? normaliseLabel(versePart, null) : null,
-          notes
-        });
-      }
-    });
-  }
-
-  return entries;
-}
 
 async function fetchLatestProductionRelease() {
   if (cachedReleaseInfo) {
@@ -393,9 +181,14 @@ async function fetchLatestProductionRelease() {
 
   if (!releaseInfoPromise) {
     releaseInfoPromise = (async () => {
-      const response = await fetch(`${RELEASES_API}?limit=20`);
+      const response = await fetch(RELEASES_API, {
+        headers: {
+          Accept: 'application/json, text/plain, */*'
+        }
+      });
+
       if (!response.ok) {
-        throw new Error(`Unable to load release list (${response.status})`);
+        throw new Error(`Door43 release lookup failed (${response.status}).`);
       }
 
       const releases = await response.json();
@@ -410,7 +203,10 @@ async function fetchLatestProductionRelease() {
         if (item.tag_name && /preprod/i.test(item.tag_name)) {
           return false;
         }
-        return Boolean(item.tag_name);
+        if (item.tag && /preprod/i.test(item.tag)) {
+          return false;
+        }
+        return Boolean(item.tag_name || item.tag);
       });
 
       if (!release) {
@@ -418,9 +214,13 @@ async function fetchLatestProductionRelease() {
       }
 
       const info = {
-        tag: release.tag_name,
-        name: release.name || release.tag_name,
-        publishedAt: release.published_at || release.created_at
+        tag: release.tag_name || release.tag || release.name,
+        name: release.name || release.tag_name || release.tag,
+        publishedAt: release.published_at || release.created_at,
+        htmlUrl: release.html_url || release.url || null,
+        assets: Array.isArray(release.assets)
+          ? release.assets.map((asset) => ({ ...asset }))
+          : []
       };
 
       cachedReleaseInfo = info;
@@ -434,246 +234,122 @@ async function fetchLatestProductionRelease() {
   return releaseInfoPromise;
 }
 
-async function resolveCachedJsonUrl(versionTag, bookId) {
-  const url = `${NETLIFY_CACHE_ENDPOINT}?owner=unfoldingWord&repo=en_tn&ref=${encodeURIComponent(
-    versionTag
-  )}&bookId=${encodeURIComponent(bookId)}`;
-  const response = await fetch(url, {
-    headers: {
-      Accept: 'application/json, text/plain, */*'
+function normaliseCandidates(values) {
+  return values
+    .map((value) => (typeof value === 'string' ? value.trim() : value))
+    .filter((value) => Boolean(value))
+    .map((value) => value.toString().toLowerCase());
+}
+
+function buildVersionCandidates(releaseTag) {
+  if (!releaseTag) {
+    return [];
+  }
+  const trimmed = releaseTag.toString().trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  const lower = trimmed.toLowerCase();
+  const withoutV = lower.replace(/^v+/i, '');
+  const candidates = new Set();
+  candidates.add(lower);
+  if (withoutV && withoutV !== lower) {
+    candidates.add(withoutV);
+    candidates.add(`v${withoutV}`);
+  }
+  return Array.from(candidates).filter(Boolean);
+}
+
+function assetNameMatchesId(name, idCandidates) {
+  if (!idCandidates.length) {
+    return false;
+  }
+  return idCandidates.some((candidate) => name.includes(candidate));
+}
+
+function assetNameMatchesVersion(name, versionCandidates) {
+  if (!versionCandidates.length) {
+    return true;
+  }
+
+  return versionCandidates.some((candidate) => {
+    if (!candidate) {
+      return false;
     }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to resolve cached translation notes (${response.status})`);
-  }
-
-  const contentType = response.headers.get('content-type') || '';
-
-  if (contentType.includes('application/json')) {
-    const data = await response.json();
     return (
-      data?.cachedUrl ||
-      data?.cached_url ||
-      data?.url ||
-      data?.href ||
-      data?.location ||
-      data?.signedUrl ||
-      data?.downloadUrl ||
-      data?.link ||
-      null
+      name.includes(`_${candidate}`) ||
+      name.includes(`-${candidate}`) ||
+      name.endsWith(`${candidate}.pdf`)
     );
-  }
+  });
+}
 
-  const text = (await response.text()).trim();
-
-  if (!text) {
+function findAssetForBook(release, { bookId, legacyId }) {
+  if (!release || !Array.isArray(release.assets)) {
     return null;
   }
 
-  try {
-    const parsed = JSON.parse(text);
-    if (parsed) {
-      return (
-        parsed.cachedUrl ||
-        parsed.cached_url ||
-        parsed.url ||
-        parsed.href ||
-        parsed.location ||
-        parsed.signedUrl ||
-        parsed.downloadUrl ||
-        parsed.link ||
-        null
-      );
-    }
-  } catch (error) {
-    if (text.startsWith('http')) {
-      return text;
+  const pdfAssets = release.assets.filter(
+    (asset) => asset && asset.name && typeof asset.name === 'string' && /\.pdf$/i.test(asset.name)
+  );
+
+  if (!pdfAssets.length) {
+    return null;
+  }
+
+  const idCandidates = normaliseCandidates([legacyId, bookId]);
+  const versionCandidates = buildVersionCandidates(resolveReleaseTag(release));
+
+  const normalizedAssets = pdfAssets.map((asset) => ({ asset, name: asset.name.toLowerCase() }));
+
+  const priorityChecks = [
+    (entry) => assetNameMatchesId(entry.name, idCandidates) && assetNameMatchesVersion(entry.name, versionCandidates),
+    (entry) => assetNameMatchesId(entry.name, idCandidates),
+    (entry) => assetNameMatchesVersion(entry.name, versionCandidates)
+  ];
+
+  for (let i = 0; i < priorityChecks.length; i += 1) {
+    const match = normalizedAssets.find(priorityChecks[i]);
+    if (match) {
+      return match.asset;
     }
   }
 
-  return null;
+  return pdfAssets[0];
 }
 
-async function fetchTranslationNotes(versionTag, bookId) {
-  const cachedUrl = await resolveCachedJsonUrl(versionTag, bookId);
-  if (!cachedUrl) {
-    throw new Error('No cached translation notes were found for this book.');
+function resolveAssetDownloadUrl(asset) {
+  if (!asset || typeof asset !== 'object') {
+    return null;
   }
 
-  try {
-    const response = await fetch(cachedUrl);
-    if (!response.ok) {
-      const error = new Error(`Unable to download translation notes data (${response.status})`);
-      error.cachedUrl = cachedUrl;
-      throw error;
-    }
-
-    const buffer = await response.arrayBuffer();
-    if (!window.pako || typeof window.pako.ungzip !== 'function') {
-      const error = new Error('Missing gzip decompression support.');
-      error.cachedUrl = cachedUrl;
-      throw error;
-    }
-
-    const decoded = window.pako.ungzip(new Uint8Array(buffer), { to: 'string' });
-
-    let notesJson;
-    try {
-      notesJson = JSON.parse(decoded);
-    } catch (parseError) {
-      const error = new Error('Downloaded translation notes were not valid JSON.');
-      error.cachedUrl = cachedUrl;
-      throw error;
-    }
-
-    return { notesJson, cachedUrl };
-  } catch (error) {
-    if (!error.cachedUrl) {
-      error.cachedUrl = cachedUrl;
-    }
-    throw error;
-  }
+  return (
+    asset.browser_download_url ||
+    asset.download_url ||
+    asset.browser_url ||
+    (asset.links && asset.links.self) ||
+    asset.url ||
+    null
+  );
 }
 
-function ensurePdfLibAvailable() {
-  return window.PDFLib && typeof window.PDFLib.PDFDocument?.create === 'function';
-}
-
-async function buildTranslationNotesPdf({
-  bookLabel,
-  versionLabel,
-  releaseInfo,
-  noteEntries
-}) {
-  if (!ensurePdfLibAvailable()) {
-    throw new Error('PDF library failed to load.');
+function triggerAssetDownload(url, filename) {
+  if (!url) {
+    return;
   }
-
-  const { PDFDocument, StandardFonts } = window.PDFLib;
-  const pdf = await PDFDocument.create();
-  const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
-
-  const margin = 40;
-  const fontSize = 11;
-  const lineHeight = fontSize * 1.45;
-
-  const addPage = () => {
-    const page = pdf.addPage();
-    return {
-      page,
-      cursorY: page.getHeight() - margin
-    };
-  };
-
-  let { page, cursorY } = addPage();
-
-  const writeLines = (
-    text,
-    { font = regularFont, size = fontSize, isHeading = false, indent = 0 } = {}
-  ) => {
-    if (!text) {
-      return;
-    }
-
-    const maxWidth = page.getWidth() - margin * 2 - indent;
-    const paragraphs = Array.isArray(text) ? text : String(text).split('\n');
-
-    paragraphs.forEach((paragraph, index) => {
-      const words = paragraph.split(/\s+/).filter(Boolean);
-      let currentLine = '';
-
-      const flushLine = (line) => {
-        if (!line) {
-          return;
-        }
-
-        const heightNeeded = lineHeight;
-        if (cursorY - heightNeeded < margin) {
-          ({ page, cursorY } = addPage());
-        }
-
-        page.drawText(line, {
-          x: margin + indent,
-          y: cursorY - heightNeeded,
-          size,
-          font,
-          lineHeight
-        });
-
-        cursorY -= heightNeeded;
-      };
-
-      words.forEach((word) => {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const width = font.widthOfTextAtSize(testLine, size);
-        if (width > maxWidth) {
-          flushLine(currentLine);
-          currentLine = word;
-        } else {
-          currentLine = testLine;
-        }
-      });
-
-      flushLine(currentLine);
-
-      if (index < paragraphs.length - 1) {
-        cursorY -= lineHeight * 0.5;
-      }
-    });
-
-    if (isHeading) {
-      cursorY -= lineHeight * 0.5;
-    }
-  };
-
-  writeLines(`${bookLabel} Translation Notes`, { font: boldFont, size: 20, isHeading: true });
-  writeLines(`Version ${versionLabel}`, { font: regularFont, size: 13, isHeading: true });
-  if (releaseInfo?.publishedAt) {
-    const published = new Date(releaseInfo.publishedAt);
-    if (!Number.isNaN(published.getTime())) {
-      writeLines(`Released: ${published.toLocaleDateString()}`, {
-        font: regularFont,
-        size: 11,
-        isHeading: true
-      });
-    }
-  }
-  writeLines(`Generated: ${new Date().toLocaleString()}`, { font: regularFont, size: 11, isHeading: true });
-  cursorY -= lineHeight;
-
-  noteEntries.forEach((entry) => {
-    const chapterLabel = entry.chapter != null ? `Chapter ${entry.chapter}` : null;
-    const verseLabel = entry.verse != null ? `Verse ${entry.verse}` : null;
-    const headingParts = [chapterLabel, verseLabel].filter(Boolean);
-    if (headingParts.length) {
-      writeLines(headingParts.join(', '), { font: boldFont, size: 13, isHeading: true });
-    }
-
-    entry.notes.forEach((noteText) => {
-      writeLines(`• ${noteText}`, { indent: 12 });
-      cursorY -= lineHeight * 0.5;
-    });
-
-    cursorY -= lineHeight * 0.5;
-  });
-
-  const bytes = await pdf.save();
-  return new Blob([bytes], { type: 'application/pdf' });
-}
-
-function triggerPdfDownload(blob, filename) {
-  const objectUrl = URL.createObjectURL(blob);
 
   const link = document.createElement('a');
-  link.href = objectUrl;
-  link.download = filename;
+  link.href = url;
+  if (filename) {
+    link.download = filename;
+  }
+  link.target = '_blank';
+  link.rel = 'noopener';
   document.body.append(link);
   link.click();
   link.remove();
 
-  return objectUrl;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -709,7 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     event.target.disabled = true;
-    let cachedNotesUrl = null;
 
     try {
       const release = await fetchLatestProductionRelease();
@@ -717,54 +392,43 @@ document.addEventListener('DOMContentLoaded', () => {
       updateVersionLabels(releaseTag);
       setStatus(`Looking up the latest translation notes for ${bookLabel} (${releaseTag})…`);
 
-      const { notesJson, cachedUrl } = await fetchTranslationNotes(releaseTag, bookId);
-      cachedNotesUrl = cachedUrl;
-      const noteEntries = flattenNotes(notesJson);
 
-      if (!noteEntries.length) {
-        throw new Error('No notes were present in the downloaded data.');
-      }
-
-      setStatus(`Building a PDF for ${bookLabel}. This may take a moment…`);
-
-      const pdfBlob = await buildTranslationNotesPdf({
-        bookLabel,
-        versionLabel: releaseTag,
-        releaseInfo: release,
-        noteEntries
+      const asset = findAssetForBook(release, {
+        bookId,
+        legacyId: selectedOption.dataset.legacyId
       });
 
-      const legacyId = selectedOption.dataset.legacyId;
-      const versionSuffix = typeof releaseTag === 'string' ? releaseTag.replace(/^v/i, '') : releaseTag;
-      const filename = legacyId
-        ? `en_tn_${legacyId}_${versionSuffix}.pdf`
-        : `en_tn_${bookId}_${versionSuffix}.pdf`;
-      const objectUrl = triggerPdfDownload(pdfBlob, filename);
+      if (!asset) {
+        throw new Error('No PDF asset was found for this book.');
+      }
 
-      const safeLink = `<a href="${objectUrl}" download="${filename}" class="inline-link">click here</a>`;
-      setStatus(`Your PDF should open automatically. If not, please ${safeLink}.`, { asHtml: true });
+      const downloadUrl = resolveAssetDownloadUrl(asset);
+      if (!downloadUrl) {
+        throw new Error('The PDF asset is missing a download link.');
+      }
 
-      setTimeout(() => {
-        URL.revokeObjectURL(objectUrl);
-      }, 300_000);
+      const filename = asset.name || `${bookId}.pdf`;
+      setStatus(`Starting your download of ${bookLabel} (${releaseTag})…`);
+
+      triggerAssetDownload(downloadUrl, filename);
+
+      const safeLink = `<a href="${downloadUrl}" class="inline-link">click here</a>`;
+      setStatus(`Your download should start automatically. If not, please ${safeLink}.`, { asHtml: true });
     } catch (error) {
       console.error(error);
-      let fallbackMessage = 'We could not build the PDF right now. Please try again in a moment.';
+      let fallbackMessage = 'We could not download the PDF right now. Please try again in a moment.';
       if (error && error.message) {
         fallbackMessage = error.message;
       }
 
-      const fallbackUrl = cachedNotesUrl || (typeof error === 'object' && error.cachedUrl ? error.cachedUrl : null);
-      const trimmedMessage = fallbackMessage ? fallbackMessage.trim() : '';
-      const needsPeriod = trimmedMessage && !/[.!?]$/.test(trimmedMessage);
       let extra = '';
-      if (fallbackUrl) {
-        extra = ` You can still <a href="${fallbackUrl}" class="inline-link">download the raw notes</a>.`;
+      if (cachedReleaseInfo?.htmlUrl) {
+        extra = ` You can browse all available files on the <a href="${cachedReleaseInfo.htmlUrl}" class="inline-link" target="_blank" rel="noopener">release page</a>.`;
       }
 
-      const combined = `${needsPeriod ? `${trimmedMessage}.` : trimmedMessage}${extra}`;
-      const finalMessage = combined.trim() || 'We could not build the PDF right now.';
-      setStatus(finalMessage, { isError: true, asHtml: true });
+      const combined = `${fallbackMessage.trim()}${extra}`.trim();
+      setStatus(combined || 'We could not download the PDF right now.', { isError: true, asHtml: true });
+
     } finally {
       event.target.disabled = false;
     }

@@ -1,5 +1,25 @@
 const RELEASES_API = 'https://git.door43.org/api/v1/repos/unfoldingWord/en_tn/releases';
 
+class DownloadError extends Error {
+  constructor(message, { url = null, status = null } = {}) {
+    const parts = [];
+    if (message) {
+      parts.push(message);
+    }
+    if (url) {
+      parts.push(`URL: ${url}`);
+    }
+    if (status) {
+      parts.push(`status: ${status}`);
+    }
+
+    super(parts.join(' '));
+    this.name = 'DownloadError';
+    this.url = url;
+    this.status = status;
+  }
+}
+
 
 const BOOK_GROUPS = [
   {
@@ -261,6 +281,36 @@ function buildVersionCandidates(releaseTag) {
   return Array.from(candidates).filter(Boolean);
 }
 
+function normaliseReleaseTag(releaseTag) {
+  if (!releaseTag) {
+    return null;
+  }
+  const trimmed = releaseTag.toString().trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (/^v/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  return `v${trimmed}`;
+}
+
+function buildFallbackAssetName({ legacyId, bookId }, releaseTag) {
+  const tag = normaliseReleaseTag(releaseTag);
+  if (!tag) {
+    return null;
+  }
+
+  const id = legacyId || (bookId ? bookId.toString().trim().toUpperCase() : '');
+  if (!id) {
+    return null;
+  }
+
+  return `en_tn_${id}_${tag}.pdf`;
+}
+
 function assetNameMatchesId(name, idCandidates) {
   if (!idCandidates.length) {
     return false;
@@ -352,6 +402,113 @@ function triggerAssetDownload(url, filename) {
 
 }
 
+function triggerBlobDownload(blob, filename) {
+  if (!blob) {
+    return null;
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  triggerAssetDownload(objectUrl, filename);
+
+  queueMicrotask(() => {
+    URL.revokeObjectURL(objectUrl);
+  });
+
+  return objectUrl;
+}
+
+async function downloadPdfCandidates(candidates) {
+  if (!Array.isArray(candidates) || !candidates.length) {
+    throw new Error('No download candidates were provided.');
+  }
+
+  let lastError = null;
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    if (!candidate || !candidate.url) {
+      continue;
+    }
+
+    try {
+      const response = await fetch(candidate.url, {
+        method: 'GET',
+        mode: 'cors',
+        credentials: 'omit'
+      });
+
+      if (!response.ok) {
+        throw new DownloadError('Download request failed.', {
+          url: candidate.url,
+          status: response.status
+        });
+      }
+
+      const blob = await response.blob();
+      const filename = candidate.filename || extractFilenameFromUrl(candidate.url);
+      return {
+        blob,
+        url: candidate.url,
+        filename
+      };
+    } catch (error) {
+      if (error instanceof DownloadError) {
+        lastError = error;
+      } else {
+        lastError = new DownloadError(error.message || 'Download request failed.', {
+          url: candidate.url
+        });
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  throw new Error('No valid download candidate succeeded.');
+}
+
+function extractFilenameFromUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return 'download.pdf';
+  }
+
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname || '';
+    const parts = pathname.split('/').filter(Boolean);
+    if (parts.length) {
+      return parts[parts.length - 1];
+    }
+  } catch (error) {
+    const segments = url.split('/').filter(Boolean);
+    if (segments.length) {
+      return segments[segments.length - 1];
+    }
+  }
+
+  return 'download.pdf';
+}
+
+function buildReleaseDownloadUrl(releaseTag, identifiers, asset) {
+  const tag = normaliseReleaseTag(releaseTag);
+  if (!tag) {
+    return null;
+  }
+
+  if (asset && asset.browser_download_url) {
+    return asset.browser_download_url;
+  }
+
+  const filename = (asset && asset.name) || buildFallbackAssetName(identifiers, releaseTag);
+  if (!filename) {
+    return null;
+  }
+
+  return `https://git.door43.org/unfoldingWord/en_tn/releases/download/${encodeURIComponent(tag)}/${encodeURIComponent(filename)}`;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const select = document.getElementById('book-select');
   if (!select) {
@@ -403,21 +560,51 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const downloadUrl = resolveAssetDownloadUrl(asset);
-      if (!downloadUrl) {
+      const fallbackUrl = buildReleaseDownloadUrl(releaseTag, {
+        bookId,
+        legacyId: selectedOption.dataset.legacyId
+      }, asset);
+
+      const candidates = [];
+      if (downloadUrl) {
+        candidates.push({
+          url: downloadUrl,
+          filename: asset.name
+        });
+      }
+
+      if (fallbackUrl && !candidates.some((item) => item.url === fallbackUrl)) {
+        candidates.push({
+          url: fallbackUrl,
+          filename: (asset && asset.name) || buildFallbackAssetName(
+            {
+              bookId,
+              legacyId: selectedOption.dataset.legacyId
+            },
+            releaseTag
+          )
+        });
+      }
+
+      if (!candidates.length) {
         throw new Error('The PDF asset is missing a download link.');
       }
 
-      const filename = asset.name || `${bookId}.pdf`;
       setStatus(`Starting your download of ${bookLabel} (${releaseTag})…`);
 
-      triggerAssetDownload(downloadUrl, filename);
+      const downloadResult = await downloadPdfCandidates(candidates);
 
-      const safeLink = `<a href="${downloadUrl}" class="inline-link">click here</a>`;
+      triggerBlobDownload(downloadResult.blob, downloadResult.filename);
+
+      const safeLink = `<a href="${downloadResult.url}" class="inline-link">click here</a>`;
       setStatus(`Your download should start automatically. If not, please ${safeLink}.`, { asHtml: true });
     } catch (error) {
       console.error(error);
       let fallbackMessage = 'We could not download the PDF right now. Please try again in a moment.';
-      if (error && error.message) {
+      if (error instanceof DownloadError) {
+        const statusText = error.status ? ` with status ${error.status}` : '';
+        fallbackMessage = `The download request to ${error.url} failed${statusText}.`;
+      } else if (error && error.message) {
         fallbackMessage = error.message;
       }
 

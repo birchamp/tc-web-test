@@ -1,5 +1,6 @@
 const RELEASES_API = 'https://git.door43.org/api/v1/repos/unfoldingWord/en_tn/releases';
 
+
 const BOOK_GROUPS = [
   {
     label: 'Pentateuch',
@@ -171,6 +172,7 @@ function setStatus(message, { isError = false, asHtml = false } = {}) {
     messageEl.textContent = message;
   }
 }
+
 
 async function fetchLatestProductionRelease() {
   if (cachedReleaseInfo) {
@@ -347,6 +349,7 @@ function triggerAssetDownload(url, filename) {
   document.body.append(link);
   link.click();
   link.remove();
+
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -389,6 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateVersionLabels(releaseTag);
       setStatus(`Looking up the latest translation notes for ${bookLabel} (${releaseTag})…`);
 
+
       const asset = findAssetForBook(release, {
         bookId,
         legacyId: selectedOption.dataset.legacyId
@@ -424,6 +428,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const combined = `${fallbackMessage.trim()}${extra}`.trim();
       setStatus(combined || 'We could not download the PDF right now.', { isError: true, asHtml: true });
+
     } finally {
       event.target.disabled = false;
     }

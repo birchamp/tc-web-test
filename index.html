@@ -44,7 +44,15 @@
           <h2>Insights and notes that illuminate every verse</h2>
           <p class="subhead">Download the latest translation notes, questions, and key terms so your team never loses momentum in Scripture checking.</p>
           <div class="hero-actions">
-            <a class="cta primary" href="helps.html">Download helps</a>
+            <button
+              id="download-helps"
+              class="cta primary"
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+            >
+              Download helps
+            </button>
             <a class="cta secondary" href="https://preview.door43.org" target="_blank" rel="noopener">Choose your own</a>
           </div>
         </div>
@@ -79,6 +87,34 @@
     </section>
   </main>
 
+  <div
+    id="helps-dialog"
+    class="helps-dialog"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="helps-dialog-title"
+    hidden
+    aria-hidden="true"
+  >
+    <div class="helps-dialog__backdrop" data-helps-close></div>
+    <div class="helps-dialog__panel helps-card">
+      <button type="button" class="helps-dialog__close" data-helps-close aria-label="Close download helps dialog">
+        ×
+      </button>
+      <p class="eyebrow">Translation Notes</p>
+      <h2 id="helps-dialog-title">Pick a book to open its PDF instantly</h2>
+      <p class="subhead">Choose a Bible book to jump straight into the latest unfoldingWord translation notes (<span data-version-label>loading…</span>).</p>
+      <label class="select-label" for="book-select">Book of the Bible</label>
+      <div class="select-wrapper">
+        <select id="book-select" class="book-select">
+          <option value="" disabled selected>Select a book…</option>
+        </select>
+      </div>
+      <p id="download-message" class="hero-status helps-status" aria-live="polite"></p>
+    </div>
+  </div>
+
   <script src="scripts/main.js" defer></script>
+  <script src="scripts/helps.js" defer></script>
 </body>
 </html>

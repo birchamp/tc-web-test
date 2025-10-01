@@ -91,49 +91,57 @@ function resetButton(button, originalText) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const downloadButton = document.getElementById('download-translationcore');
-  const statusEl = document.getElementById('download-status');
+  const attachDownloadHandler = (buttonId, statusId) => {
+    const downloadButton = document.getElementById(buttonId);
+    const statusEl = statusId ? document.getElementById(statusId) : null;
 
-  if (!downloadButton) return;
-
-  const originalText = downloadButton.textContent;
-  const loadingText = downloadButton.dataset.loadingText || 'Preparing download…';
-
-  downloadButton.addEventListener('click', async () => {
-    downloadButton.disabled = true;
-    downloadButton.textContent = loadingText;
-    if (statusEl) {
-      statusEl.textContent = 'Looking for the latest translationCore release for your device…';
+    if (!downloadButton) {
+      return;
     }
 
-    try {
-      const { asset, os } = await fetchLatestAsset();
+    const originalText = downloadButton.textContent;
+    const loadingText = downloadButton.dataset.loadingText || 'Preparing download…';
 
-      if (!asset || !asset.browser_download_url) {
-        throw new Error('No download available for your platform.');
-      }
-
+    downloadButton.addEventListener('click', async () => {
+      downloadButton.disabled = true;
+      downloadButton.textContent = loadingText;
       if (statusEl) {
-        const osLabel = os === 'unknown' ? 'your device' : os.toUpperCase();
-        statusEl.textContent = `Starting ${osLabel} download…`;
+        statusEl.textContent = 'Looking for the latest translationCore release for your device…';
       }
 
-      window.location.href = asset.browser_download_url;
-    } catch (error) {
-      console.error(error);
-      if (statusEl) {
-        statusEl.textContent = 'Unable to find an automatic download. Redirecting you to the releases page…';
-      }
-      window.open(RELEASE_FALLBACK, '_blank', 'noopener');
-    } finally {
-      setTimeout(() => {
-        if (statusEl) {
-          statusEl.textContent = '';
+      try {
+        const { asset, os } = await fetchLatestAsset();
+
+        if (!asset || !asset.browser_download_url) {
+          throw new Error('No download available for your platform.');
         }
-        resetButton(downloadButton, originalText);
-      }, 2500);
-    }
-  });
+
+        if (statusEl) {
+          const osLabel = os === 'unknown' ? 'your device' : os.toUpperCase();
+          statusEl.textContent = `Starting ${osLabel} download…`;
+        }
+
+        window.location.href = asset.browser_download_url;
+      } catch (error) {
+        console.error(error);
+        if (statusEl) {
+          statusEl.textContent = 'Unable to find an automatic download. Redirecting you to the releases page…';
+        }
+        window.open(RELEASE_FALLBACK, '_blank', 'noopener');
+      } finally {
+        setTimeout(() => {
+          if (statusEl) {
+            statusEl.textContent = '';
+          }
+          resetButton(downloadButton, originalText);
+        }, 2500);
+      }
+    });
+  };
+
+  attachDownloadHandler('download-translationcore', 'download-status');
+  attachDownloadHandler('download-translationcore-page', 'download-status-page');
+  attachDownloadHandler('download-translationcore-page-footer', 'download-status-page-footer');
 
   const helpsTrigger = document.getElementById('download-helps');
   const helpsDialog = document.getElementById('helps-dialog');

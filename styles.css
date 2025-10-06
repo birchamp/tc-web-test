@@ -894,6 +894,37 @@ body.dialog-open {
   color: rgba(255, 255, 255, 0.8);
 }
 
+.download-card {
+  text-align: center;
+  padding: clamp(36px, 6vw, 48px);
+}
+
+.download-platform h3 {
+  margin: 0 0 8px 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.download-platform p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #64748b;
+  margin-bottom: 20px;
+}
+
+.download-btn {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.download-footer {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid rgba(148, 163, 184, 0.3);
+}
+
 /* Responsive Design */
 @media (max-width: 1024px) {
   .tc-simple__hero-inner {

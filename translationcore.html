@@ -28,10 +28,9 @@
             <p class="subhead">A focused desktop workspace that keeps translation teams aligned with checks, notes, and alignment tools built for church-led movements.</p>
             <p class="tc-simple__lead">translationCore provides comprehensive checking tools including figures of speech analysis, key term consistency, and AI-assisted alignment to ensure accurate, clear, and natural Scripture translation.</p>
             <div class="hero-actions">
-              <button id="download-translationcore-page" class="cta primary" data-loading-text="Preparing download…">Download translationCore</button>
+              <a href="#download" class="cta primary">Download translationCore</a>
               <a class="cta secondary" href="https://github.com/unfoldingWord/translationCore" target="_blank" rel="noopener">View on GitHub</a>
             </div>
-            <p class="hero-status" id="download-status-page" aria-live="polite"></p>
           </div>
           <div class="tc-simple__hero-figure">
             <div class="tc-simple__video">
@@ -100,14 +99,38 @@
 
     <section class="tc-simple__section tc-simple__section--muted" id="download">
       <div class="tc-simple__container">
-        <div class="tc-simple__cta">
-          <h2>Ready to get started?</h2>
-          <p>Download the latest version of translationCore and begin your church-based Bible translation journey.</p>
-          <div class="hero-actions">
-            <button id="download-translationcore-page-footer" class="cta primary" data-loading-text="Preparing download…">Download translationCore</button>
-            <a class="cta secondary" href="https://github.com/unfoldingWord/translationCore/releases" target="_blank" rel="noopener">View all releases</a>
-          </div>
+        <h2>Download translationCore</h2>
+        <p>Choose the version that works best for your operating system.</p>
+
+        <div class="tc-simple__grid">
+          <article class="tc-simple__card download-card">
+            <div class="download-platform">
+              <h3>Windows</h3>
+              <p>Compatible with Windows 10 and later</p>
+            </div>
+            <button class="cta primary download-btn" data-platform="windows" data-loading-text="Preparing download…">Download for Windows</button>
+          </article>
+
+          <article class="tc-simple__card download-card">
+            <div class="download-platform">
+              <h3>macOS</h3>
+              <p>Compatible with macOS 10.15 and later</p>
+            </div>
+            <button class="cta primary download-btn" data-platform="macos" data-loading-text="Preparing download…">Download for macOS</button>
+          </article>
+
+          <article class="tc-simple__card download-card">
+            <div class="download-platform">
+              <h3>Linux</h3>
+              <p>Ubuntu, Debian, and other distributions</p>
+            </div>
+            <button class="cta primary download-btn" data-platform="linux" data-loading-text="Preparing download…">Download for Linux</button>
+          </article>
+        </div>
+
+        <div class="download-footer">
           <p class="hero-status" id="download-status-page-footer" aria-live="polite"></p>
+          <a class="inline-link" href="https://github.com/unfoldingWord/translationCore/releases" target="_blank" rel="noopener">View all releases and source code</a>
         </div>
       </div>
     </section>

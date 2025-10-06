@@ -143,6 +143,65 @@ document.addEventListener('DOMContentLoaded', () => {
   attachDownloadHandler('download-translationcore-page', 'download-status-page');
   attachDownloadHandler('download-translationcore-page-footer', 'download-status-page-footer');
 
+  // Handle platform-specific download buttons
+  document.querySelectorAll('.download-btn').forEach(button => {
+    const platform = button.dataset.platform;
+    if (!platform) return;
+
+    const originalText = button.textContent;
+    const loadingText = button.dataset.loadingText || 'Preparing download…';
+    const statusEl = document.getElementById('download-status-page-footer');
+
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = loadingText;
+      if (statusEl) {
+        statusEl.textContent = 'Looking for the latest translationCore release…';
+      }
+
+      try {
+        const response = await fetch(RELEASE_API, {
+          headers: {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28'
+          }
+        });
+
+        if (!response.ok) {
+          throw new Error(`GitHub API request failed: ${response.status}`);
+        }
+
+        const data = await response.json();
+        const asset = chooseBestAsset(data.assets || [], platform);
+
+        if (!asset || !asset.browser_download_url) {
+          throw new Error('No download available for this platform.');
+        }
+
+        if (statusEl) {
+          const platformLabel = platform.toUpperCase();
+          statusEl.textContent = `Starting ${platformLabel} download…`;
+        }
+
+        window.location.href = asset.browser_download_url;
+      } catch (error) {
+        console.error(error);
+        if (statusEl) {
+          statusEl.textContent = 'Unable to find an automatic download. Redirecting you to the releases page…';
+        }
+        window.open(RELEASE_FALLBACK, '_blank', 'noopener');
+      } finally {
+        setTimeout(() => {
+          if (statusEl) {
+            statusEl.textContent = '';
+          }
+          button.disabled = false;
+          button.textContent = originalText;
+        }, 2500);
+      }
+    });
+  });
+
   const helpsTrigger = document.getElementById('download-helps');
   const helpsDialog = document.getElementById('helps-dialog');
   const helpsCloseButtons = helpsDialog ? helpsDialog.querySelectorAll('[data-helps-close]') : [];
